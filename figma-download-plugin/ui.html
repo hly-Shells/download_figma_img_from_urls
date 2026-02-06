@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 12px 16px;
+      font-family: 'Inter', -apple-system, sans-serif;
+      font-size: 12px;
+      color: #333;
+    }
+    h3 {
+      margin: 0 0 12px 0;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .row {
+      margin-bottom: 12px;
+    }
+    label {
+      display: block;
+      margin-bottom: 4px;
+      font-weight: 500;
+      color: #666;
+    }
+    select {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      font-size: 12px;
+      background: #fff;
+    }
+    select:focus {
+      outline: none;
+      border-color: #0d99ff;
+    }
+    input[type="text"],
+    input[type="password"] {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      font-size: 12px;
+      background: #fff;
+    }
+    input:focus {
+      outline: none;
+      border-color: #0d99ff;
+    }
+    button {
+      width: 100%;
+      margin-top: 8px;
+      padding: 10px 16px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #fff;
+      background: #0d99ff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    button:hover { background: #0b85e0; }
+    button:active { background: #0a74c7; }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .hint {
+      margin-top: 8px;
+      font-size: 11px;
+      color: #888;
+      line-height: 1.4;
+    }
+    #status {
+      margin-top: 10px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      min-height: 20px;
+    }
+    #status.error { background: #ffebee; color: #c62828; }
+    #status.success { background: #e8f5e9; color: #2e7d32; }
+  </style>
+</head>
+<body>
+  <h3>UGC 图片导出</h3>
+  <div class="row">
+    <label>倍率</label>
+    <select id="scale">
+      <option value="1">1x</option>
+      <option value="2">2x</option>
+      <option value="3" selected>3x</option>
+      <option value="4">4x</option>
+    </select>
+  </div>
+  <div class="row">
+    <label>格式</label>
+    <select id="format">
+      <option value="PNG" selected>PNG</option>
+      <option value="JPG">JPG</option>
+    </select>
+  </div>
+  <div class="row">
+    <label>TinyPNG API Key（可选）</label>
+    <input type="password" id="tinypngKey" placeholder="不填或无效则不压缩，直接下载原图" autocomplete="off" />
+  </div>
+  <button id="btn">下载选中图层</button>
+  <p class="hint">在画布中选中要导出的帧/图层，点击上方按钮即可下载。填写 TinyPNG Key 时会在下载前压缩，不填则跳过压缩。</p>
+  <div id="status"></div>
+
+  <script>
+    const TINYPNG_SHRINK_URL = 'https://api.tinify.com/shrink';
+    const scaleEl = document.getElementById('scale');
+    const formatEl = document.getElementById('format');
+    const tinypngKeyEl = document.getElementById('tinypngKey');
+    const btnEl = document.getElementById('btn');
+    const statusEl = document.getElementById('status');
+
+    function setStatus(text, kind) {
+      statusEl.textContent = text || '';
+      statusEl.className = kind || '';
+    }
+
+    function downloadBlob(bytes, name, mime) {
+      const blob = new Blob([bytes], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function getTinypngKey() {
+      const key = (tinypngKeyEl && tinypngKeyEl.value) ? String(tinypngKeyEl.value).trim() : '';
+      return key.length > 0 ? key : null;
+    }
+
+    async function compressWithTinypng(bytes, apiKey) {
+      const auth = btoa('api:' + apiKey);
+      const res = await fetch(TINYPNG_SHRINK_URL, {
+        method: 'POST',
+        headers: { 'Authorization': 'Basic ' + auth },
+        body: bytes,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || err.error || 'TinyPNG 请求失败 ' + res.status);
+      }
+      const data = await res.json();
+      const outUrl = data.output && data.output.url;
+      if (!outUrl) throw new Error('TinyPNG 未返回压缩结果');
+      const outRes = await fetch(outUrl);
+      if (!outRes.ok) throw new Error('获取压缩图失败 ' + outRes.status);
+      return new Uint8Array(await outRes.arrayBuffer());
+    }
+
+    async function handleExport(msg) {
+      const raw = msg.bytes;
+      const bytes = raw instanceof Uint8Array ? raw : new Uint8Array(raw || []);
+      const name = msg.name || 'export.png';
+      const isPng = /\.png$/i.test(name);
+      const mime = isPng ? 'image/png' : 'image/jpeg';
+      const key = getTinypngKey();
+      if (key) {
+        try {
+          const compressed = await compressWithTinypng(bytes, key);
+          downloadBlob(compressed, name, mime);
+        } catch (e) {
+          setStatus('TinyPNG 压缩失败，已下载原图: ' + (e.message || String(e)), 'error');
+          downloadBlob(bytes, name, mime);
+        }
+      } else {
+        downloadBlob(bytes, name, mime);
+      }
+    }
+
+    window.onmessage = async (event) => {
+      const msg = event.data.pluginMessage;
+      if (!msg) return;
+
+      if (msg.type === 'export') {
+        await handleExport(msg);
+        return;
+      }
+      if (msg.type === 'done') {
+        setStatus('已触发下载，请到浏览器默认下载目录查看。', 'success');
+        return;
+      }
+      if (msg.type === 'error') {
+        setStatus(msg.message || '出错', 'error');
+      }
+    };
+
+    btnEl.onclick = () => {
+      setStatus('');
+      parent.postMessage(
+        {
+          pluginMessage: {
+            type: 'download',
+            scale: parseInt(scaleEl.value, 10),
+            format: formatEl.value,
+          },
+        },
+        '*'
+      );
+    };
+  </script>
+</body>
+</html>

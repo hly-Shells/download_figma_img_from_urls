@@ -1,0 +1,11 @@
+# Figma URL 列表
+# 每行一个 URL，支持 # 注释
+# 空行会被忽略
+
+# 背景图片
+https://www.figma.com/design/mVCcQJPK1pHXRauJULaQiC/ugc?node-id=618-21942
+
+# 返回按钮
+# https://www.figma.com/design/mVCcQJPK1pHXRauJULaQiC/ugc?node-id=618-12345
+
+https://www.figma.com/design/mVCcQJPK1pHXRauJULaQiC/ugc?node-id=8019-68010&m=dev

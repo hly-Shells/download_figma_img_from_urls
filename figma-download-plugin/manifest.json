@@ -1,0 +1,13 @@
+{
+  "name": "UGC 图片导出下载",
+  "id": "ugc-figma-download",
+  "api": "1.0.0",
+  "editorType": ["figma", "dev"],
+  "main": "code.js",
+  "ui": "ui.html",
+  "capabilities": ["inspect"],
+  "networkAccess": {
+    "allowedDomains": ["none"],
+    "devAllowedDomains": ["http://localhost:8765", "http://127.0.0.1:8765"]
+  }
+}

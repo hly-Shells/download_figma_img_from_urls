@@ -23,15 +23,29 @@ curl -fsSL "$REPO/requirements.txt" -o requirements.txt
 
 echo ""
 echo "📦 创建虚拟环境并安装依赖..."
-python3 -m venv "$INSTALL_DIR/venv"
-"$INSTALL_DIR/venv/bin/pip" install -q -r requirements.txt
+INSTALL_DIR_ABS="$(cd "$INSTALL_DIR" && pwd)"
+PYTHON_BIN=""
+
+if python3 -m venv "$INSTALL_DIR/venv" 2>/dev/null; then
+    "$INSTALL_DIR/venv/bin/pip" install -q -r requirements.txt
+    PYTHON_BIN="$INSTALL_DIR_ABS/venv/bin/python"
+else
+    echo "   虚拟环境创建失败，尝试 pip --user 安装..."
+    if python3 -m pip install --user -q -r requirements.txt 2>/dev/null; then
+        PYTHON_BIN="python3"
+    else
+        echo "❌ 安装失败。请确保已安装 Python 3 和 pip，或尝试："
+        echo "   python3 -m ensurepip --user"
+        echo "   python3 -m pip install --user -r requirements.txt"
+        exit 1
+    fi
+fi
 
 # 创建 figmad 命令到 ~/.local/bin，确保全局可用
 mkdir -p "$BIN_DIR"
-INSTALL_DIR_ABS="$(cd "$INSTALL_DIR" && pwd)"
 cat > "$BIN_DIR/figmad" << EOF
 #!/bin/bash
-exec "$INSTALL_DIR_ABS/venv/bin/python" "$INSTALL_DIR_ABS/download_figma_image.py" "\$@"
+exec "$PYTHON_BIN" "$INSTALL_DIR_ABS/download_figma_image.py" "\$@"
 EOF
 chmod +x "$BIN_DIR/figmad"
 

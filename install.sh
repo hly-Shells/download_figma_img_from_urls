@@ -22,21 +22,16 @@ echo "📥 下载 requirements.txt ..."
 curl -fsSL "$REPO/requirements.txt" -o requirements.txt
 
 echo ""
-echo "📦 安装 Python 依赖..."
-if command -v pip3 &>/dev/null; then
-    pip3 install -q -r requirements.txt
-elif command -v pip &>/dev/null; then
-    pip install -q -r requirements.txt
-else
-    python3 -m pip install -q -r requirements.txt
-fi
+echo "📦 创建虚拟环境并安装依赖..."
+python3 -m venv "$INSTALL_DIR/venv"
+"$INSTALL_DIR/venv/bin/pip" install -q -r requirements.txt
 
 # 创建 figmad 命令到 ~/.local/bin，确保全局可用
 mkdir -p "$BIN_DIR"
 INSTALL_DIR_ABS="$(cd "$INSTALL_DIR" && pwd)"
 cat > "$BIN_DIR/figmad" << EOF
 #!/bin/bash
-exec python3 "$INSTALL_DIR_ABS/download_figma_image.py" "\$@"
+exec "$INSTALL_DIR_ABS/venv/bin/python" "$INSTALL_DIR_ABS/download_figma_image.py" "\$@"
 EOF
 chmod +x "$BIN_DIR/figmad"
 

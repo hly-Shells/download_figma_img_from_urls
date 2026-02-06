@@ -8,18 +8,22 @@
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/hly-Shells/download_figma_img_from_urls/main/install.sh | bash
+```
 
-# 或指定安装目录
+安装后 `figmad` 命令全局可用（安装到 `~/.local/bin`，并自动加入 PATH）。若需指定安装目录：
+
+```bash
 curl -fsSL https://raw.githubusercontent.com/hly-Shells/download_figma_img_from_urls/main/install.sh | bash -s /path/to/install
 ```
 
 ### 方式二：curl 手动下载
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hly-Shells/download_figma_img_from_urls/main/download_figma_image.py -o download_figma_image.py
-curl -fsSL https://raw.githubusercontent.com/hly-Shells/download_figma_img_from_urls/main/requirements.txt -o requirements.txt
-pip install -r requirements.txt
+mkdir -p ~/figmad && cd ~/figmad
+curl -fsSL https://raw.githubusercontent.com/hly-Shells/download_figma_img_from_urls/main/install.sh | bash -s .
 ```
+
+同样会将 `figmad` 安装到 `~/.local/bin`，全局可用。
 
 ### 方式三：Git 克隆
 
@@ -27,19 +31,21 @@ pip install -r requirements.txt
 git clone https://github.com/hly-Shells/download_figma_img_from_urls.git
 cd download_figma_img_from_urls
 pip install -r requirements.txt
+# 使 figmad 全局可用：
+curl -fsSL https://raw.githubusercontent.com/hly-Shells/download_figma_img_from_urls/main/install.sh | bash -s "$(pwd)"
 ```
 
 ## 快速使用
 
 ```bash
 # 单张图片
-python3 download_figma_image.py --url "你的Figma链接" --output output.png
+figmad --url "你的Figma链接" --output output.png
 
 # 批量下载（命令行传入多个 URL）
-python3 download_figma_image.py --urls "url1" "url2" --output-dir ./images
+figmad --urls "url1" "url2" --output-dir ./images
 
 # 批量下载（从文件读取）
-python3 download_figma_image.py --urls-file urls.txt --output-dir ./images
+figmad --urls-file urls.txt --output-dir ./images
 ```
 
 ---
@@ -147,36 +153,36 @@ TINYPNG_API_KEY=YOUR_TINYPNG_API_KEY
 
 ```bash
 # 使用 URL，指定输出
-python3 download_figma_image.py --url "https://www.figma.com/design/xxx?node-id=618-21942" --output output.png
+figmad --url "https://www.figma.com/design/xxx?node-id=618-21942" --output output.png
 
 # 使用 URL，自动生成文件名
-python3 download_figma_image.py --url "https://www.figma.com/design/xxx?node-id=618-21942"
+figmad --url "https://www.figma.com/design/xxx?node-id=618-21942"
 
 # 使用 file-key + node-id
-python3 download_figma_image.py --file-key mVCcQJPK1pHXRauJULaQiC --node-id 618:21942 --output output.png
+figmad --file-key mVCcQJPK1pHXRauJULaQiC --node-id 618:21942 --output output.png
 ```
 
 ### 批量下载
 
 ```bash
 # 从文件读取
-python3 download_figma_image.py --urls-file urls.txt --output-dir assets/images
+figmad --urls-file urls.txt --output-dir assets/images
 
 # 命令行传入多个 URL
-python3 download_figma_image.py --urls "url1" "url2" "url3" --output-dir assets/images
+figmad --urls "url1" "url2" "url3" --output-dir assets/images
 ```
 
 ### 其他示例
 
 ```bash
 # @2x 不压缩
-python3 download_figma_image.py --url "..." --output out@2x.png --scale 2 --no-compress
+figmad --url "..." --output out@2x.png --scale 2 --no-compress
 
 # SVG 格式
-python3 download_figma_image.py --url "..." --output icon.svg --format svg --no-compress
+figmad --url "..." --output icon.svg --format svg --no-compress
 
 # 指定环境变量文件
-python3 download_figma_image.py --url "..." --output out.png --env-file /path/to/.env
+figmad --url "..." --output out.png --env-file /path/to/.env
 ```
 
 ---

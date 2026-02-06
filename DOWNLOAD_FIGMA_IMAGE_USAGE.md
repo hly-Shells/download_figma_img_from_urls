@@ -155,6 +155,17 @@ python3 scripts/download_figma_image.py \
 - `node-id` 中的 `:` 会被替换为 `_`（例如：`618:21942` → `618_21942`）
 - 如果不指定 `--output-dir`，默认使用当前目录
 
+### 方法 2b: 批量下载 - 命令行直接传入多个 URL
+
+支持在命令行中直接传入多个 Figma URL：
+
+```bash
+python3 scripts/download_figma_image.py \
+  --urls "https://www.figma.com/design/mVCcQJPK1pHXRauJULaQiC/ugc?node-id=618-21942" \
+         "https://www.figma.com/design/mVCcQJPK1pHXRauJULaQiC/ugc?node-id=618-12345" \
+  --output-dir assets/images
+```
+
 ### 方法 3: 单张图片 - 使用单独参数
 
 ```bash
@@ -189,11 +200,17 @@ python3 scripts/download_figma_image.py \
 |------|------|------|
 | `--url` | Figma 设计 URL（自动解析 file-key 和 node-id） | `https://www.figma.com/design/mVCcQJPK1pHXRauJULaQiC/ugc?node-id=618-21942` |
 
-**方式 2: 批量下载 - 从文件读取 URL**
+**方式 2a: 批量下载 - 从文件读取 URL**
 
 | 参数 | 说明 | 示例 |
 |------|------|------|
 | `--urls-file` | 包含多个 Figma URL 的文件路径（每行一个 URL，支持 # 注释） | `urls.txt` |
+
+**方式 2b: 批量下载 - 命令行传入多个 URL**
+
+| 参数 | 说明 | 示例 |
+|------|------|------|
+| `--urls` | 多个 Figma URL（直接在命令行传入） | `"url1" "url2" "url3"` |
 
 **方式 3: 使用单独参数**
 
@@ -202,7 +219,7 @@ python3 scripts/download_figma_image.py \
 | `--file-key` | Figma 文件 Key（从 URL 中获取） | `mVCcQJPK1pHXRauJULaQiC` |
 | `--node-id` | Figma 节点 ID（从 URL 中获取） | `618:21942` |
 
-> **注意**: `--url`、`--urls-file` 和 `--file-key/--node-id` 是互斥的，只能使用其中一种方式。
+> **注意**: `--url`、`--urls`、`--urls-file` 和 `--file-key/--node-id` 是互斥的，只能使用其中一种方式。
 
 ### 输出参数
 

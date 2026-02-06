@@ -397,6 +397,9 @@ def main():
   # 批量下载：从文件读取 URL 列表
   %(prog)s --urls-file urls.txt --output-dir assets/images
 
+  # 批量下载：命令行直接传入多个 URL
+  %(prog)s --urls "https://www.figma.com/design/...?node-id=618-1" "https://www.figma.com/design/...?node-id=618-2" --output-dir assets/images
+
   # 批量下载：自动生成文件名（基于 node-id）
   %(prog)s --urls-file urls.txt
 
@@ -418,11 +421,17 @@ def main():
         help='Figma 设计 URL（例如：https://www.figma.com/design/mVCcQJPK1pHXRauJULaQiC/ugc?node-id=618-21942）'
     )
     input_group.add_argument(
+        '--urls',
+        nargs='+',
+        metavar='URL',
+        help='多个 Figma URL（直接在命令行传入）'
+    )
+    input_group.add_argument(
         '--urls-file',
         help='包含多个 Figma URL 的文件路径（每行一个 URL，支持 # 注释）'
     )
     
-    # 单独参数（与 --url 和 --urls-file 互斥）
+    # 单独参数（与 --url、--urls、--urls-file 互斥）
     file_key_group = parser.add_argument_group('单独参数（与 --url 和 --urls-file 互斥）')
     file_key_group.add_argument(
         '--file-key',
@@ -516,24 +525,30 @@ def main():
         print(f"   📝 获取 API key: https://tinypng.com/developers")
     print()
     
-    # 处理批量下载
+    # 处理批量下载（--urls 或 --urls-file）
+    urls = None
     if args.urls_file:
-        print(f"📋 批量下载模式：从文件读取 URL 列表")
-        print(f"📄 URL 文件: {args.urls_file}")
+        urls = load_urls_from_file(Path(args.urls_file))
+        if urls is None:
+            return False
+    elif args.urls:
+        urls = [u.strip() for u in args.urls if u and u.strip()]
+
+    if urls is not None:
+        if args.urls_file:
+            print(f"📋 批量下载模式：从文件读取 URL 列表")
+            print(f"📄 URL 文件: {args.urls_file}")
+        else:
+            print(f"📋 批量下载模式：命令行传入 {len(urls)} 个 URL")
         print(f"📁 输出目录: {args.output_dir}")
         print(f"📐 分辨率: {args.scale}x")
         print(f"📄 格式: {args.format}")
         print()
-        
-        # 读取 URL 列表
-        urls = load_urls_from_file(Path(args.urls_file))
-        if urls is None:
-            return False
-        
+
         if not urls:
-            print("❌ URL 文件为空或没有有效的 URL")
+            print("❌ URL 列表为空或没有有效的 URL")
             return False
-        
+
         print(f"✅ 找到 {len(urls)} 个 URL")
         print()
         
@@ -590,7 +605,7 @@ def main():
         file_key = args.file_key
         node_id = args.node_id
         if not file_key or not node_id:
-            print("❌ 错误: 需要提供 --url、--urls-file 或同时提供 --file-key 和 --node-id")
+            print("❌ 错误: 需要提供 --url、--urls、--urls-file 或同时提供 --file-key 和 --node-id")
             return False
     
     # 确定输出路径

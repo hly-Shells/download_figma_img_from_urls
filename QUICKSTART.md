@@ -46,7 +46,16 @@ python3 scripts/download_figma_image.py \
 
 脚本会自动为每张图片生成文件名（基于 `node-id`）。
 
-### 方法 2: 使用终端环境变量
+### 方法 2b: 批量下载 - 命令行直接传入多个 URL
+
+```bash
+python3 scripts/download_figma_image.py \
+  --urls "https://www.figma.com/design/...?node-id=618-21942" \
+         "https://www.figma.com/design/...?node-id=618-12345" \
+  --output-dir assets/images
+```
+
+### 方法 3: 使用终端环境变量
 
 ```bash
 # 设置环境变量

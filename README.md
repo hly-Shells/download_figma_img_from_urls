@@ -46,6 +46,10 @@ figmad --urls "url1" "url2" --output-dir ./images
 
 # 批量下载（从文件读取）
 figmad --urls-file urls.txt --output-dir ./images
+
+# 空间/文件全量下载：下载该 Figma 文件中每页顶级 Frame/Component 的所有图片
+figmad --space "https://www.figma.com/design/xxx/文件名" --output-dir ./output
+figmad -S --file-key lPYDYqE7QzcrFs3xd1XIA6 -o ./exports
 ```
 
 ---
@@ -114,16 +118,31 @@ TINYPNG_API_KEY=YOUR_TINYPNG_API_KEY
 
 ## 命令行使用详解
 
-### 输入方式（三选一）
+### 输入方式（四选一）
 
 | 参数 | 说明 | 示例 |
 |------|------|------|
+| `--space` / `-S` | **空间模式**：下载整个文件中每页顶级 Frame/Component 的所有图片 | `figmad --space "https://figma.com/design/xxx"` |
 | `--url` | 单个 Figma URL | `--url "https://www.figma.com/design/xxx?node-id=618-21942"` |
 | `--urls` | 多个 Figma URL（命令行传入） | `--urls "url1" "url2"` |
 | `--urls-file` | 包含多个 URL 的文件（每行一个，支持 # 注释） | `--urls-file urls.txt` |
 | `--file-key` + `--node-id` | 单独指定 file-key 和 node-id | `--file-key xxx --node-id 618:21942` |
 
-> `--url`、`--urls`、`--urls-file` 与 `--file-key/--node-id` 互斥。
+> `--space` 与 URL 模式互斥。`--url`、`--urls`、`--urls-file` 与 `--file-key/--node-id` 互斥。
+
+#### 空间模式参数（`--space` / `-S`）
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `url_or_key` | Figma 文件 URL 或 file_key（位置参数） | - |
+| `--file-key` / `-k` | Figma 文件 key | - |
+| `--output-dir` / `-o` | 输出根目录 | `./output` |
+| `--scale` / `-s` | 导出倍率（1x/2x/3x/4x） | `3` |
+| `--batch-size` / `-b` | 每批请求节点数 | `5` |
+| `--no-compress` | 跳过 oxipng 无损压缩 | - |
+| `--format` / `-f` | 导出格式 png/jpg | `png` |
+
+空间模式输出结构：`output/{页面名}/{Frame名}_{node_id}.png`
 
 ### 输出参数
 
@@ -141,7 +160,7 @@ TINYPNG_API_KEY=YOUR_TINYPNG_API_KEY
 | `--env-file` | 环境变量文件路径 | 无 |
 | `--figma-token` | Figma Access Token | 按优先级读取 |
 | `--tinypng-key` | TinyPNG API Key | 按优先级读取 |
-| `--scale` | 分辨率倍数 1x/2x/3x | `3` |
+| `--scale` | 分辨率倍数 1x/2x/3x/4x | `3` |
 | `--format` | 格式 png/jpg/svg/pdf | `png` |
 | `--no-compress` | 跳过 TinyPNG 压缩 | `False` |
 
@@ -170,6 +189,19 @@ figmad --urls-file urls.txt --output-dir assets/images
 
 # 命令行传入多个 URL
 figmad --urls "url1" "url2" "url3" --output-dir assets/images
+```
+
+### 空间/文件全量下载示例
+
+```bash
+# 使用 Figma 文件 URL
+figmad --space "https://www.figma.com/design/lPYDYqE7QzcrFs3xd1XIA6/设计稿"
+
+# 使用 file-key
+figmad -S --file-key lPYDYqE7QzcrFs3xd1XIA6 -o ./exports
+
+# 指定倍率、跳过压缩
+figmad --space "URL" --scale 2 --no-compress
 ```
 
 ### 其他示例

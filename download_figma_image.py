@@ -471,8 +471,8 @@ def main():
         '--scale',
         type=int,
         default=3,
-        choices=[1, 2, 3],
-        help='图片分辨率倍数（1x, 2x, 3x），默认 3'
+        choices=[1, 2, 3, 4],
+        help='图片分辨率倍数（1x, 2x, 3x, 4x），默认 3'
     )
     parser.add_argument(
         '--format',

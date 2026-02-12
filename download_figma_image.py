@@ -7,11 +7,17 @@
 import os
 import sys
 import argparse
+import time
 import requests
 import json
 import re
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
+
+# Figma API 请求重试配置
+FIGMA_API_RETRIES = 4
+FIGMA_API_TIMEOUT = 90
+FIGMA_API_RETRY_DELAY = 2
 
 # TinyPNG API 配置
 TINYPNG_API_URL = "https://api.tinify.com/shrink"
@@ -126,20 +132,33 @@ def parse_figma_url(url):
 
 
 def get_file_structure(file_key, access_token):
-    """获取 Figma 文件的完整结构"""
+    """获取 Figma 文件的完整结构（带重试，应对 Response ended prematurely 等网络问题）"""
     url = f"https://api.figma.com/v1/files/{file_key}"
-    headers = {"X-Figma-Token": access_token}
-    
-    try:
-        response = requests.get(url, headers=headers, timeout=30)
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"❌ 获取文件结构失败: {e}")
-        if hasattr(e, 'response') and e.response is not None:
-            print(f"响应状态码: {e.response.status_code}")
-            print(f"响应内容: {e.response.text[:500]}")
-        return None
+    headers = {
+        "X-Figma-Token": access_token,
+        "User-Agent": "figmad/1.0",
+    }
+    last_error = None
+    for attempt in range(1, FIGMA_API_RETRIES + 1):
+        try:
+            response = requests.get(url, headers=headers, timeout=FIGMA_API_TIMEOUT)
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            last_error = e
+            if attempt < FIGMA_API_RETRIES:
+                delay = FIGMA_API_RETRY_DELAY * attempt
+                print(f"   ⚠️  第 {attempt} 次尝试失败: {e}")
+                print(f"   🔄 {delay} 秒后重试 ({attempt + 1}/{FIGMA_API_RETRIES})...")
+                time.sleep(delay)
+            else:
+                break
+    print(f"❌ 获取文件结构失败（已重试 {FIGMA_API_RETRIES} 次）: {last_error}")
+    if hasattr(last_error, 'response') and last_error.response is not None:
+        print(f"   响应状态码: {last_error.response.status_code}")
+        if last_error.response.text:
+            print(f"   响应内容: {last_error.response.text[:500]}")
+    return None
 
 
 def collect_frame_nodes(node, page_name="", nodes_list=None):
@@ -328,27 +347,34 @@ def get_file_node_info(file_key, node_id, access_token):
 
 
 def get_image_export_url(file_key, node_ids, scale=3, format="png", access_token=None):
-    """获取图片导出 URL"""
+    """获取图片导出 URL（带重试）"""
     url = f"https://api.figma.com/v1/images/{file_key}"
     params = {
         "ids": ",".join(node_ids),
         "format": format,
         "scale": scale
     }
-    headers = {}
+    headers = {"User-Agent": "figmad/1.0"}
     if access_token:
         headers["X-Figma-Token"] = access_token
-    
-    try:
-        response = requests.get(url, params=params, headers=headers)
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"❌ 获取图片导出 URL 失败: {e}")
-        if hasattr(e, 'response') and e.response is not None:
-            print(f"响应状态码: {e.response.status_code}")
-            print(f"响应内容: {e.response.text}")
-        return None
+    last_error = None
+    for attempt in range(1, FIGMA_API_RETRIES + 1):
+        try:
+            response = requests.get(url, params=params, headers=headers, timeout=FIGMA_API_TIMEOUT)
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            last_error = e
+            if attempt < FIGMA_API_RETRIES:
+                time.sleep(FIGMA_API_RETRY_DELAY * attempt)
+            else:
+                break
+    print(f"❌ 获取图片导出 URL 失败（已重试 {FIGMA_API_RETRIES} 次）: {last_error}")
+    if hasattr(last_error, 'response') and last_error.response is not None:
+        print(f"   响应状态码: {last_error.response.status_code}")
+        if last_error.response.text:
+            print(f"   响应内容: {last_error.response.text[:300]}")
+    return None
 
 
 def download_single_image(url, output_path, figma_token, tinypng_key, scale=3, format='png', no_compress=False, file_key=None, node_id=None):

@@ -3,19 +3,14 @@
 # 支持：单张/批量 URL 下载、空间/文件全量下载（--space）
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# 检测 --space 模式，委托给空间下载脚本（并移除 --space/-S 参数）
-SPACE_ARGS=()
-FOUND_SPACE=0
+# -S 为 --space 简写，统一转为 --space 传给 download_figma_image.py
+ARGS=()
 for arg in "$@"; do
-    if [ "$arg" = "--space" ] || [ "$arg" = "-S" ]; then
-        FOUND_SPACE=1
+    if [ "$arg" = "-S" ]; then
+        ARGS+=("--space")
     else
-        SPACE_ARGS+=("$arg")
+        ARGS+=("$arg")
     fi
 done
 
-if [ "$FOUND_SPACE" = "1" ]; then
-    exec python3 "$SCRIPT_DIR/download_figma_space.py" "${SPACE_ARGS[@]}"
-fi
-
-exec python3 "$SCRIPT_DIR/download_figma_image.py" "$@"
+exec python3 "$SCRIPT_DIR/download_figma_image.py" "${ARGS[@]}"

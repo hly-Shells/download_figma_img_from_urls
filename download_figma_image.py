@@ -96,7 +96,7 @@ def parse_figma_url(url):
     - https://www.figma.com/file/{file_key}/文件名?node-id={node_id}
     - https://figma.com/design/{file_key}/文件名?node-id={node_id}
     
-    返回: (file_key, node_id) 或 (None, None)
+    返回: (file_key, node_id) 或 (None, None)，无 node-id 时返回 (file_key, None)
     """
     try:
         # 解析 URL
@@ -123,6 +123,56 @@ def parse_figma_url(url):
     except Exception as e:
         print(f"⚠️  URL 解析失败: {e}")
         return None, None
+
+
+def get_file_structure(file_key, access_token):
+    """获取 Figma 文件的完整结构"""
+    url = f"https://api.figma.com/v1/files/{file_key}"
+    headers = {"X-Figma-Token": access_token}
+    
+    try:
+        response = requests.get(url, headers=headers, timeout=30)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"❌ 获取文件结构失败: {e}")
+        if hasattr(e, 'response') and e.response is not None:
+            print(f"响应状态码: {e.response.status_code}")
+            print(f"响应内容: {e.response.text[:500]}")
+        return None
+
+
+def collect_frame_nodes(node, page_name="", nodes_list=None):
+    """
+    递归遍历节点树，收集可导出的 Frame 节点（每页的直接子节点）
+    返回: [(node_id, node_name, page_name), ...]
+    """
+    if nodes_list is None:
+        nodes_list = []
+    
+    if not node or 'id' not in node:
+        return nodes_list
+    
+    node_type = node.get('type', '')
+    
+    # DOCUMENT 是根节点，遍历其子节点（CANVAS 页面）
+    if node_type == 'DOCUMENT':
+        children = node.get('children', [])
+        for child in children:
+            page_name = child.get('name', 'Page') if child.get('name') else 'Page'
+            collect_frame_nodes(child, page_name, nodes_list)
+        return nodes_list
+    
+    # CANVAS 是页面，遍历其直接子节点（通常是 Frame/画板）
+    if node_type == 'CANVAS':
+        children = node.get('children', [])
+        for child in children:
+            if child.get('id'):
+                child_name = child.get('name', 'unnamed')
+                nodes_list.append((child['id'], child_name, page_name))
+        return nodes_list
+    
+    return nodes_list
 
 
 def optimize_image_with_tinypng(input_path, output_path, api_key):
@@ -382,6 +432,29 @@ def generate_output_filename(node_id, scale=3, format='png', output_dir=None):
         return Path(filename)
 
 
+def sanitize_filename(name):
+    """将节点名称转为安全的文件名"""
+    if not name:
+        return "unnamed"
+    # 移除或替换不安全字符
+    safe = re.sub(r'[<>:"/\\|?*]', '_', name)
+    safe = re.sub(r'\s+', '_', safe).strip('._')
+    return safe[:100] if safe else "unnamed"
+
+
+def generate_space_output_filename(page_name, frame_name, node_id, scale=3, format='png', output_dir=None):
+    """为空间模式生成输出文件名：页面名/画板名@倍数.格式"""
+    safe_page = sanitize_filename(page_name)
+    safe_frame = sanitize_filename(frame_name)
+    safe_node_id = node_id.replace(':', '_')
+    filename = f"{safe_frame}@{scale}x.{format}"
+    
+    if output_dir:
+        return Path(output_dir) / safe_page / filename
+    else:
+        return Path(safe_page) / filename
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='从 Figma 下载图片并使用 TinyPNG 压缩',
@@ -411,10 +484,13 @@ def main():
 
   # 不使用压缩
   %(prog)s --url "https://www.figma.com/design/..." --output output.png --no-compress
+
+  # 下载整个空间（文件内所有页面的顶级画板）
+  %(prog)s --space "https://www.figma.com/design/mVCcQJPK1pHXRauJULaQiC/ugc" --output-dir ./exports
         """
     )
     
-    # URL、批量文件或单独参数（三选一）
+    # URL、批量文件、整个空间或单独参数（四选一）
     input_group = parser.add_mutually_exclusive_group(required=True)
     input_group.add_argument(
         '--url',
@@ -429,6 +505,11 @@ def main():
     input_group.add_argument(
         '--urls-file',
         help='包含多个 Figma URL 的文件路径（每行一个 URL，支持 # 注释）'
+    )
+    input_group.add_argument(
+        '--space',
+        metavar='URL',
+        help='Figma 空间/文件 URL（下载整个文件内所有页面的顶级画板）'
     )
     
     # 单独参数（与 --url、--urls、--urls-file 互斥）
@@ -525,6 +606,92 @@ def main():
         print(f"   📝 获取 API key: https://tinypng.com/developers")
     print()
     
+    # 处理整个空间下载（--space）
+    if args.space:
+        print(f"📂 空间模式：下载整个 Figma 文件")
+        print(f"🔗 URL: {args.space}")
+        file_key, _ = parse_figma_url(args.space)
+        if not file_key:
+            print("❌ 错误: 无法从 URL 中解析 file-key")
+            return False
+        
+        print(f"🔑 文件 Key: {file_key}")
+        print(f"📁 输出目录: {args.output_dir}")
+        print(f"📐 分辨率: {args.scale}x")
+        print(f"📄 格式: {args.format}")
+        print()
+        
+        # 获取文件结构
+        print("🔄 正在获取文件结构...")
+        file_data = get_file_structure(file_key, figma_token)
+        if not file_data:
+            return False
+        
+        document = file_data.get('document')
+        if not document:
+            print("❌ 错误: 文件结构中没有 document 节点")
+            return False
+        
+        # 收集所有可导出的 Frame 节点
+        nodes_list = collect_frame_nodes(document)
+        if not nodes_list:
+            print("⚠️  未找到可导出的画板（每页的顶级 Frame）")
+            print("   提示: 确保 Figma 文件中每页有至少一个画板/Frame")
+            return False
+        
+        print(f"✅ 找到 {len(nodes_list)} 个画板")
+        print()
+        
+        # 批量获取图片导出 URL（Figma API 单次最多 50 个节点）
+        BATCH_SIZE = 50
+        output_dir = Path(args.output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        success_count = 0
+        for i in range(0, len(nodes_list), BATCH_SIZE):
+            batch = nodes_list[i:i + BATCH_SIZE]
+            node_ids = [n[0] for n in batch]
+            
+            image_urls = get_image_export_url(
+                file_key,
+                node_ids,
+                scale=args.scale,
+                format=args.format,
+                access_token=figma_token
+            )
+            
+            if not image_urls or 'images' not in image_urls:
+                print(f"❌ 获取导出 URL 失败")
+                continue
+            
+            for node_id, node_name, page_name in batch:
+                image_url = image_urls['images'].get(node_id)
+                if not image_url:
+                    print(f"   ⚠️  跳过 {page_name}/{node_name}: 无导出 URL")
+                    continue
+                
+                output_path = generate_space_output_filename(
+                    page_name, node_name, node_id,
+                    args.scale, args.format, args.output_dir
+                )
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                
+                print(f"📥 [{success_count + 1}/{len(nodes_list)}] {page_name} / {node_name}")
+                if download_image(
+                    image_url,
+                    output_path,
+                    optimize=not args.no_compress,
+                    api_key=tinypng_key if not args.no_compress else None
+                ):
+                    success_count += 1
+                    print(f"   ✅ 完成")
+                else:
+                    print(f"   ❌ 失败")
+                print()
+        
+        print(f"✅ 空间下载完成：成功 {success_count}/{len(nodes_list)}")
+        return success_count > 0
+    
     # 处理批量下载（--urls 或 --urls-file）
     urls = None
     if args.urls_file:
@@ -605,7 +772,7 @@ def main():
         file_key = args.file_key
         node_id = args.node_id
         if not file_key or not node_id:
-            print("❌ 错误: 需要提供 --url、--urls、--urls-file 或同时提供 --file-key 和 --node-id")
+            print("❌ 错误: 需要提供 --url、--urls、--urls-file、--space 或同时提供 --file-key 和 --node-id")
             return False
     
     # 确定输出路径
